@@ -22,25 +22,35 @@ BOOL GetCommitCountersFromProcess(int pid, _Out_ PCommitCounters counters) {
 		return FALSE;
 	}
 	SYSTEM_INFO si;
-	PSAPI_WORKING_SET_INFORMATION wsi, *pwsi;
-	MEMORY_BASIC_INFORMATION mbi, *pmbi;
-	GetSystemInfo(&si);
-	QueryWorkingSet(hProcess, &wsi, sizeof(pwsi));
 
-	for (ULONG_PTR i = 0; i < wsi.NumberOfEntries; ++i) {
-		VirtualQuery(&wsi.WorkingSetInfo[1], &mbi, sizeof(pmbi));
-		if (mbi.State == MEM_COMMIT) {
-			if (mbi.Type == MEM_IMAGE) {
-				counters->img += 1;
-			}
-			if (mbi.Type == MEM_MAPPED) {
-				counters->map += 1;
-			}
-			if (mbi.Type == MEM_PRIVATE) {
-				counters->prv += 1;
-			}
+	MEMORY_BASIC_INFORMATION mbi, *pmbi;
+
+	GetSystemInfo(&si);
+	SIZE_T bytes = 0, aux = 0, dim = 0;
+	PMEMORY_BASIC_INFORMATION pmbi;
+	int count = 2;
+	while (count-- > 0) {
+		if (bytes == 0) {
+			bytes = VirtualQueryEx(hProcess, NULL, &mbi, sizeof(mbi));
+		}
+		else {
+			free(pmbi);
+		}
+			
+		if (GetLastError() != 0) {
+			emptyCounters(counters);
+			return FALSE;
+		}
+		dim = sizeof(mbi)*bytes;
+		pmbi = (PMEMORY_BASIC_INFORMATION)malloc(dim);
+		aux = VirtualQueryEx(hProcess, NULL, pmbi, dim);
+		if (aux > bytes) {
+			bytes = aux;
 		}
 	}
+	for(SIZE_T idx = 0; idx < dim ; idx += pmbi->RegionSize){}
+	
+
 	return TRUE;
 }
 
