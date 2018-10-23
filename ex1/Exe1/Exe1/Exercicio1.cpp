@@ -21,26 +21,19 @@ BOOL GetCommitCountersFromProcess(int pid, _Out_ PCommitCounters counters) {
 		emptyCounters(counters);
 		return FALSE;
 	}
-	SYSTEM_INFO si;
-	PSAPI_WORKING_SET_INFORMATION wsi, *pwsi;
 	MEMORY_BASIC_INFORMATION mbi, *pmbi;
-	GetSystemInfo(&si);
-	QueryWorkingSet(hProcess, &wsi, sizeof(pwsi));
 
-	for (ULONG_PTR i = 0; i < wsi.NumberOfEntries; ++i) {
-		VirtualQuery(&wsi.WorkingSetInfo[1], &mbi, sizeof(pmbi));
-		if (mbi.State == MEM_COMMIT) {
-			if (mbi.Type == MEM_IMAGE) {
-				counters->img += 1;
-			}
-			if (mbi.Type == MEM_MAPPED) {
-				counters->map += 1;
-			}
-			if (mbi.Type == MEM_PRIVATE) {
-				counters->prv += 1;
-			}
+	while (VirtualQuery(hProcess, &mbi, sizeof(pmbi)) != 0) {
+		if (mbi.Type == MEM_IMAGE) {
+			counters->img += mbi.RegionSize;
 		}
-	}
+		if (mbi.Type == MEM_MAPPED) {
+			counters->map += mbi.RegionSize;
+		}
+		if (mbi.Type == MEM_PRIVATE) {
+			counters->prv += mbi.RegionSize;
+		}
+	}	
 	return TRUE;
 }
 
@@ -51,9 +44,11 @@ void printResults(PCommitCounters counters) {
 }
 
 int main(int argc, char argv[]) {
-	int id;
-	printf("Process id: ");
-	scanf_s("%d", &id);
+	if (argc < 3) {
+		printf("No process was specified as argument of the program!");
+		return 1;
+	}
+	int id = atoi(&argv[2]);
 	PCommitCounters commit = (PCommitCounters)malloc(sizeof(CommitCounters));
 	emptyCounters(commit);
 	if (GetCommitCountersFromProcess(id, commit)) {
@@ -61,8 +56,7 @@ int main(int argc, char argv[]) {
 		return 0;
 	}
 	printf("%d",GetLastError());
-	int i = 0;
-	while (i++ < 10000);
+	getchar();
 
 	return 0;
 }
