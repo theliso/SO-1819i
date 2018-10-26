@@ -24,14 +24,16 @@ BOOL GetCommitCountersFromProcess(int pid, _Out_ PCommitCounters counters) {
 	MEMORY_BASIC_INFORMATION mbi, *pmbi;
 
 	while (VirtualQuery(hProcess, &mbi, sizeof(pmbi)) != 0) {
-		if (mbi.Type == MEM_IMAGE) {
-			counters->img += mbi.RegionSize;
-		}
-		if (mbi.Type == MEM_MAPPED) {
-			counters->map += mbi.RegionSize;
-		}
-		if (mbi.Type == MEM_PRIVATE) {
-			counters->prv += mbi.RegionSize;
+		if (mbi.State == MEM_COMMIT) {
+			if (mbi.Type == MEM_IMAGE) {
+				counters->img += mbi.RegionSize;
+			}
+			if (mbi.Type == MEM_MAPPED) {
+				counters->map += mbi.RegionSize;
+			}
+			if (mbi.Type == MEM_PRIVATE) {
+				counters->prv += mbi.RegionSize;
+			}
 		}
 	}	
 	return TRUE;

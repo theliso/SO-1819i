@@ -2,11 +2,28 @@
 #include<Windows.h>
 #include<tchar.h>
 
+
 typedef struct {
-	DWORD height;
-	DWORD width;
-	
-};
+	BYTE tagNumber;
+	BYTE dataFormat;
+	BYTE nrOfComponents;
+	BYTE offsetDataValue;
+}IMAGE_FILE_DIRECTORY, *PIMAGE_FILE_DIRECTORY;
+
+
+typedef struct {
+	DWORD nrOfEntries;
+	IMAGE_FILE_DIRECTORY imagefile[1];
+}TABLE_ENTRY, *PTABLE_ENTRY;
+
+VOID PrintLastError() {
+	printf("" + GetLastError());
+}
+
+//Navigate through pointers in the structure and print the metadata
+VOID PrintTags(LPVOID view) {
+
+}
 
 LPVOID MappingHandler(HANDLE hFile) {
 	HANDLE hMap = CreateFileMapping(hFile, 0, PAGE_READONLY, 0, 0, 0);
@@ -36,12 +53,22 @@ LPVOID CreateFileHandlerW(WCHAR *filename) {
 	return MappingHandler(hFile);
 }
 
-VOID PrintExifTags(CHAR *filename) {
-	
-	
-	HANDLE fileView = MapViewOfFile(hMap, FILE_MAP_COPY, NULL, NULL, 0);
-	CloseHandle(hMap);
+VOID PrintExifTagsA(CHAR *filename) {
+	LPVOID view = CreateFileHandlerA(filename);
+	if (view == NULL) {
+		PrintLastError();
+		return;
+	}
+	PrintTags(view);
+}
 
+VOID PrintExifTagsW(WCHAR *filename) {
+	LPVOID view = CreateFileHandlerW(filename);
+	if (view == NULL) {
+		PrintLastError();
+		return;
+	}
+	PrintTags(view);
 }
 
 
@@ -51,6 +78,6 @@ int main(DWORD argc, TCHAR *argv[]) {
 		printf("The arguments are few!");
 		return 1;
 	}
-	PrintExifTags(*argv[1]);
+	PrintExifTags(argv[1]);
 	return 0;
 }
