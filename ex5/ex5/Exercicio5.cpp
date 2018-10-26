@@ -2,27 +2,72 @@
 #include<Windows.h>
 #include<tchar.h>
 
+#define INTEL 0x4949
+#define MOTOROLA 0x4d4d
+
+#define MODEL_MOT 0x0110
+#define MODEL_INTEL 0x1001
+
+#define DATE_TIME_MOT 0X9003
+#define DATE_TIME_INTEL 0X0390
+
+#define ISO_MOT 0X8827
+#define ISO_INTEL 0X2788
+
+#define APERTURE_VALUE_MOT 0X9202
+#define APERTURE_VALUE_INTEL 0x0292
+
+#define IMAGE_WIDTH_MOT 0Xa002
+#define IMAGE_WIDTH_INTEL 0X02a0
+
+#define IMAGE_HEIGHT_MOT 0Xa003
+#define IMAGE_HEIGHT_INTEL 0Xa003
+
+
+
+
+#pragma pack(push,1)
 
 typedef struct {
-	BYTE tagNumber;
-	BYTE dataFormat;
-	BYTE nrOfComponents;
-	BYTE offsetDataValue;
-}IMAGE_FILE_DIRECTORY, *PIMAGE_FILE_DIRECTORY;
+	USHORT		mark;
+	USHORT		size;
+	UINT		exifHeader;
+	USHORT		exifData;
+	USHORT		brand;
+	USHORT		tagMark;
+	UINT		offsetToFirstIFD;
 
+}TIFF_HEADER, *PTIFF_HEADER;
 
 typedef struct {
-	DWORD nrOfEntries;
-	IMAGE_FILE_DIRECTORY imagefile[1];
-}TABLE_ENTRY, *PTABLE_ENTRY;
+	USHORT tagNumber;
+	USHORT dataFormat;
+	UINT nrOfComponents;
+	UINT offsetDataValue;
+}ENTRIES, *PENTRIES;
+
+#pragma pack(pop)
+
+
 
 VOID PrintLastError() {
 	printf("" + GetLastError());
 }
 
 //Navigate through pointers in the structure and print the metadata
-VOID PrintTags(LPVOID view) {
+VOID PrintTags(LPVOID baseView) {
+	PTIFF_HEADER tHeader = (PTIFF_HEADER)baseView;
+	while (tHeader->mark != 0xFFE1){
+		baseView = (char *)((char *)baseView + tHeader->size + sizeof(tHeader ->mark));
+		tHeader = (PTIFF_HEADER)baseView;
+	}
+	PENTRIES entry = (PENTRIES)(tHeader->offsetToFirstIFD + tHeader);
+	
 
+	//if(tHeader ->brand == INTEL)
+
+
+	 
 }
 
 LPVOID MappingHandler(HANDLE hFile) {
@@ -70,7 +115,6 @@ VOID PrintExifTagsW(WCHAR *filename) {
 	}
 	PrintTags(view);
 }
-
 
 
 int main(DWORD argc, TCHAR *argv[]) {
