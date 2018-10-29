@@ -22,8 +22,13 @@ BOOL GetCommitCountersFromProcess(int pid, _Out_ PCommitCounters counters) {
 		return FALSE;
 	}
 	MEMORY_BASIC_INFORMATION mbi, *pmbi;
+	SYSTEM_INFO si;
+	GetSystemInfo(&si);
 
-	while (VirtualQuery(hProcess, &mbi, sizeof(pmbi)) != 0) {
+	LPVOID base = si.lpMinimumApplicationAddress;
+
+	while (base < si.lpMaximumApplicationAddress) {
+		VirtualQueryEx(hProcess, &si, &mbi, sizeof(pmbi));
 		if (mbi.State == MEM_COMMIT) {
 			if (mbi.Type == MEM_IMAGE) {
 				counters->img += mbi.RegionSize;
@@ -35,6 +40,7 @@ BOOL GetCommitCountersFromProcess(int pid, _Out_ PCommitCounters counters) {
 				counters->prv += mbi.RegionSize;
 			}
 		}
+		base = ((char*)base + mbi.RegionSize);
 	}	
 	return TRUE;
 }

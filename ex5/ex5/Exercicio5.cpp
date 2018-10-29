@@ -40,6 +40,10 @@ typedef struct {
 }TIFF_HEADER, *PTIFF_HEADER;
 
 typedef struct {
+	USHORT numberOfEntries;
+}NUMBER_ENTRIES, *PNUMBER_ENTRIES;
+
+typedef struct {
 	USHORT tagNumber;
 	USHORT dataFormat;
 	UINT nrOfComponents;
@@ -61,7 +65,11 @@ VOID PrintTags(LPVOID baseView) {
 		baseView = (char *)((char *)baseView + tHeader->size + sizeof(tHeader ->mark));
 		tHeader = (PTIFF_HEADER)baseView;
 	}
-	PENTRIES entry = (PENTRIES)(tHeader->offsetToFirstIFD + tHeader);
+	PNUMBER_ENTRIES nrOfEntries = (PNUMBER_ENTRIES)(tHeader->offsetToFirstIFD + tHeader);
+	PENTRIES entry = (PENTRIES)(nrOfEntries + sizeof(PNUMBER_ENTRIES));
+	for (DWORD i = 0; i < nrOfEntries->numberOfEntries; ++i) {
+		//inc the entries and theirs offset and print
+	}
 	
 
 	//if(tHeader ->brand == INTEL)
