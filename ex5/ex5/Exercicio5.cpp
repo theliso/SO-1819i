@@ -58,6 +58,14 @@ VOID PrintLastError() {
 	printf("" + GetLastError());
 }
 
+VOID VerifyInIntelMode(PENTRIES entry) {
+
+}
+
+VOID VerifyInMMMode(PENTRIES entry) {
+ 
+}
+
 //Navigate through pointers in the structure and print the metadata
 VOID PrintTags(LPVOID baseView) {
 	PTIFF_HEADER tHeader = (PTIFF_HEADER)baseView;
@@ -68,14 +76,15 @@ VOID PrintTags(LPVOID baseView) {
 	PNUMBER_ENTRIES nrOfEntries = (PNUMBER_ENTRIES)(tHeader->offsetToFirstIFD + tHeader);
 	PENTRIES entry = (PENTRIES)(nrOfEntries + sizeof(PNUMBER_ENTRIES));
 	for (DWORD i = 0; i < nrOfEntries->numberOfEntries; ++i) {
-		//inc the entries and theirs offset and print
+		if (tHeader->brand == INTEL) {
+			VerifyInIntelMode(entry);
+		}
+		else {
+			VerifyInMMMode(entry);
+		}
+		entry += sizeof(PENTRIES);
 	}
-	
-
-	//if(tHeader ->brand == INTEL)
-
-
-	 
+	CloseHandle(baseView);
 }
 
 LPVOID MappingHandler(HANDLE hFile) {
