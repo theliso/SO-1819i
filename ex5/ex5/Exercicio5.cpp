@@ -29,6 +29,11 @@
 
 #pragma pack(push,1)
 
+typedef struct{
+	USHORT		begin_Mark;
+	USHORT		size;
+}MARK, *PMARK; 
+
 typedef struct {
 	USHORT		mark;
 	USHORT		size;
@@ -63,7 +68,7 @@ CHAR data_formats[12] = {'%d','%s','%d','%d','%f','%d',NULL,'%d','%d','%f','%f',
 
 
 VOID PrintLastError() {
-	printf("" + GetLastError());
+	printf("%d\n", GetLastError());
 }
 
 VOID VerifyInIntelMode(PENTRIES entry,PTIFF_HEADER header ) {
@@ -130,13 +135,37 @@ VOID VerifyInMMMode(PENTRIES entry, PTIFF_HEADER header) {
 
 //Navigate through pointers in the structure and print the metadata
 VOID PrintTags(LPVOID baseView) {
-	PTIFF_HEADER tHeader = (PTIFF_HEADER)baseView;
+	/*PTIFF_HEADER tHeader = (PTIFF_HEADER)baseView;
+	printf("Mark: %x \n", tHeader->mark);
+	printf("Size: %x \n", tHeader->size);
+	printf("ExifHeader: %x \n", tHeader->exifHeader);
+	printf("ExifData: %x \n", tHeader->exifData);
+	printf("Brand: %x \n", tHeader->brand);
+	printf("TagMark: %x \n", tHeader->tagMark);	
+	printf("OffsetToIFD: %x \n", tHeader->offsetToFirstIFD);
+	*/
 
-	while ((char*)tHeader == (char*)EOF && tHeader->mark != 0xFFE1){
-		baseView = (char *)((char *)baseView + tHeader->size + sizeof(tHeader ->mark));
-		tHeader = (PTIFF_HEADER)baseView;
+	//Get Over the starting mark
+	baseView = ((char *)baseView) + sizeof(USHORT);
+	PMARK mark = (PMARK)(baseView);
+
+
+	while (mark->begin_Mark != 0xD9FF && mark->begin_Mark != 0xE1FF){
+		//baseView = (char *)((char *)baseView + tHeader->size + sizeof(tHeader ->mark));
+		baseView = (char *)((char *)baseView + sizeof(MARK) + mark ->size);
+		mark = (PMARK)baseView;
 	}
-	PNUMBER_ENTRIES entries = (PNUMBER_ENTRIES)(tHeader->offsetToFirstIFD + tHeader);
+
+	PTIFF_HEADER tHeader = (PTIFF_HEADER)baseView;
+	printf("Mark: %x \n", tHeader->mark);
+	printf("Size: %x \n", tHeader->size);
+	printf("ExifHeader: %x \n", tHeader->exifHeader);
+	printf("ExifData: %x \n", tHeader->exifData);
+	printf("Brand: %x \n", tHeader->brand);
+	printf("TagMark: %x \n", tHeader->tagMark);
+	printf("OffsetToIFD: %x \n", tHeader->offsetToFirstIFD);
+
+	PNUMBER_ENTRIES entries = (PNUMBER_ENTRIES)(tHeader->offsetToFirstIFD + (sizeof(UINT)*2)+(sizeof(USHORT)) +((char*)baseView));
 	for (DWORD i = 0; i < entries->numberOfEntries; ++i) {
 		long data_address;
 		if (tHeader->brand == INTEL) {
@@ -150,7 +179,7 @@ VOID PrintTags(LPVOID baseView) {
 }
 
 LPVOID MappingHandler(HANDLE hFile) {
-	HANDLE hMap = CreateFileMapping(hFile, 0, PAGE_READONLY | SEC_IMAGE, 0, 0, 0);
+	HANDLE hMap = CreateFileMapping(hFile, 0, PAGE_READONLY, 0, 0, 0);
 	if (hMap == NULL) {
 		CloseHandle(hFile);
 		return NULL;
@@ -162,7 +191,7 @@ LPVOID MappingHandler(HANDLE hFile) {
 }
 
 LPVOID CreateFileHandlerA(CHAR *filename) {
-	HANDLE hFile = CreateFileA((LPCSTR)filename, GENERIC_READ , 0, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+	HANDLE hFile = CreateFileA(filename, GENERIC_READ , 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 	if (hFile == INVALID_HANDLE_VALUE) {
 		return NULL;
 	}
@@ -170,7 +199,7 @@ LPVOID CreateFileHandlerA(CHAR *filename) {
 }
 
 LPVOID CreateFileHandlerW(WCHAR *filename) {
-	HANDLE hFile = CreateFileW((LPCWSTR)filename, GENERIC_READ , 0, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+	HANDLE hFile = CreateFileW((LPCWSTR)filename, GENERIC_READ , 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 	if (hFile == INVALID_HANDLE_VALUE) {
 		return NULL;
 	}
