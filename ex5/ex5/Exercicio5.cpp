@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_DEPRECATE
 #include<stdio.h>
 #include<Windows.h>
 #include<tchar.h>
@@ -6,23 +7,26 @@
 #define INTEL 0x4949
 #define MOTOROLA 0x4d4d
 
-#define MODEL_MOT 0x0110
-#define MODEL_INTEL 0x1001
+#define MODEL_INTEL 0x0110
+#define MODEL_MOT 0x1001
 
-#define DATE_TIME_MOT 0X9003
-#define DATE_TIME_INTEL 0X0390
+#define DATE_TIME_INTEL 0X9003
+#define DATE_TIME_MOT 0X0390
 
-#define ISO_MOT 0X8827
-#define ISO_INTEL 0X2788
+#define ISO_INTEL 0X8827
+#define ISO_MOT 0X2788
 
-#define APERTURE_VALUE_MOT 0X9202
-#define APERTURE_VALUE_INTEL 0x0292
+#define APERTURE_VALUE_INTEL 0X9202
+#define APERTURE_VALUE_MOT 0x0292
 
-#define IMAGE_WIDTH_MOT 0Xa002
-#define IMAGE_WIDTH_INTEL 0X02a0
+#define IMAGE_WIDTH_INTEL 0Xa002
+#define IMAGE_WIDTH_MOT 0X02a0
 
-#define IMAGE_HEIGHT_MOT 0Xa003
-#define IMAGE_HEIGHT_INTEL 0X03a0
+#define IMAGE_HEIGHT_INTEL 0Xa003
+#define IMAGE_HEIGHT_MOT 0X03a0
+
+#define EXIF_SUB_OFFSET_INTEL 0x8769
+#define EXIF_SUB_OFFSET_MOT 0x6987
 
 
 
@@ -56,6 +60,7 @@ typedef struct {
 typedef struct {
 	USHORT numberOfEntries;
 	PENTRIES entries[1];
+	//PENTRIES entries;
 }NUMBER_ENTRIES, *PNUMBER_ENTRIES;
 
 
@@ -64,73 +69,116 @@ typedef struct {
 
 DWORD intelij[2] = {INTEL,MOTOROLA};
 
-CHAR data_formats[12] = {'%d','%s','%d','%d','%f','%d',NULL,'%d','%d','%f','%f','%f'};
+const char *data_formats[12] = {"%d","%s","%d","%d","%f","%d",NULL,"%d","%d","%f","%f","%f"};
 
 
 VOID PrintLastError() {
 	printf("%d\n", GetLastError());
 }
 
-VOID VerifyInIntelMode(PENTRIES entry,PTIFF_HEADER header ) {
-	char *data_address = (char *)(header + entry->offsetDataValue);
-	char data_format = data_formats[entry->dataFormat];
+VOID VerifyInIntelMode(PENTRIES entry, LPVOID header ) {
+	char *data_address = (char *)(((char *)header) + entry->offsetDataValue);
+	const char *data_format = data_formats[entry->dataFormat-1];
 	
 	if (entry->tagNumber == MODEL_INTEL) {
-		printf("Model: " + data_format, *data_address);
+		printf("Model: ");
+		for (int i = 0; i < entry->nrOfComponents;++i) {
+			printf("%c", data_address[i]);
+		}
+		printf("\n");
 		return;
 	}		
 	if (entry->tagNumber == DATE_TIME_INTEL) {
-		printf("Data: " + data_format, *data_address);
+		printf("Data: ");
+		for (int i = 0; i < entry->nrOfComponents; ++i) {
+			printf("%c", data_address[i]);
+		}
+
+		printf("\n");
 		return;
 	}
 	if (entry->tagNumber == ISO_INTEL) {
-		printf("ISO: " + data_format, *data_address);
+		char *res = (char *)malloc(sizeof("ISO: ") + sizeof(data_format));
+		sprintf(res, "ISO: ", data_format);
+		printf(res, *data_address);
+		printf("\n");
 		return;
 	}
 	if (entry->tagNumber == APERTURE_VALUE_INTEL){
-		printf("Abertura: F 1 / " + data_format, *data_address);
+		char *res = (char *)malloc(sizeof("Abertura: F 1 / ") + sizeof(data_format));
+		sprintf(res, "Abertura: F 1 / ", data_format);
+		printf(res, *data_address);
+		printf("\n");
 		return;
 	}		
 	if (entry->tagNumber == IMAGE_WIDTH_INTEL) {
-		printf("Dimensão: " + data_format, *data_address);
+		char *res = (char *)malloc(sizeof("Dimensao ") + sizeof(data_format));
+		sprintf(res, "Dimensao ", data_format);
+		printf(res, *data_address);
 		printf(" px x ");
+		printf("\n");
 		return;
 	}		
 	if (entry->tagNumber == IMAGE_HEIGHT_INTEL) {
-		printf(data_format + " px", *data_address);
+		char *res = (char *) (sizeof(data_format));
+		sprintf(res, data_format);
+		printf(res, *data_address);
+		printf(" px");
+		printf("\n");
 	}
 }
 
-VOID VerifyInMMMode(PENTRIES entry, PTIFF_HEADER header) {
-	char *data_address = (char *)(header + entry->offsetDataValue);
-	char data_format = data_formats[entry->dataFormat];
+VOID VerifyInMMMode(PENTRIES entry, LPVOID header) {
+	char *data_address = (char *)(((char *)header) + entry->offsetDataValue);
+	const char *data_format = data_formats[entry->dataFormat];
 
 	if (entry->tagNumber == MODEL_MOT){
-		printf("Model: " + data_format, *data_address);
+		printf("Model: ");
+		for (int i = 0; i < entry->nrOfComponents; ++i) {
+			printf("%c", data_address[i]);
+		}
+		printf("\n");
 		return;
 	}
 	if (entry->tagNumber == DATE_TIME_MOT) {
-		printf("Data: " + data_format, *data_address);
+		char *res = (char *)malloc(sizeof("Data: ") + sizeof(data_format));
+		sprintf(res, "Data: ", data_format);
+		printf(res, *data_address);
+		printf("\n");
 		return;
 	}
 		
 
 	if (entry->tagNumber == ISO_MOT) {
-		printf("ISO: " + data_format, *data_address);
+		char *res = (char *)malloc(sizeof("ISO: ") + sizeof(data_format));
+		sprintf(res, "ISO: ", data_format);
+		printf(res, *data_address);
+		printf("\n");
 		return;
 	}
 		
 	if (entry->tagNumber == APERTURE_VALUE_MOT) {
-		printf("Abertura: F 1 / " + data_format, *data_address);
+		char *res = (char *)malloc(sizeof("Abertura: F 1 / ") + sizeof(data_format));
+		sprintf(res, "Abertura: F 1 / ", data_format);
+		printf(res, *data_address);
+		printf("\n");
 		return;
 	}
 	if (entry->tagNumber == IMAGE_WIDTH_MOT) {
-		printf("Dimensão: " + data_format, *data_address);
+		char *res = (char *)malloc(sizeof("Dimensao ") + sizeof(data_format));
+		sprintf(res, "Dimensao ", data_format);
+		printf(res, *data_address);
 		printf(" px x ");
+		printf("\n");
 		return;
 	}
-	if (entry->tagNumber == IMAGE_HEIGHT_MOT)
-		printf(data_format + " px", *data_address);
+	if (entry->tagNumber == IMAGE_HEIGHT_MOT) {
+		char *res = (char *)(sizeof(data_format));
+		sprintf(res, data_format);
+		printf(res, *data_address);
+		printf(" px");
+		printf("\n");
+	}
 }
 
 //Navigate through pointers in the structure and print the metadata
@@ -146,17 +194,19 @@ VOID PrintTags(LPVOID baseView) {
 	*/
 
 	//Get Over the starting mark
-	baseView = ((char *)baseView) + sizeof(USHORT);
-	PMARK mark = (PMARK)(baseView);
+	PMARK mark = (PMARK)(((char *)baseView) + sizeof(USHORT));
+	LPVOID past_starting = (LPVOID) (((char *)baseView) + sizeof(USHORT));
 
 
 	while (mark->begin_Mark != 0xD9FF && mark->begin_Mark != 0xE1FF){
 		//baseView = (char *)((char *)baseView + tHeader->size + sizeof(tHeader ->mark));
-		baseView = (char *)((char *)baseView + sizeof(MARK) + mark ->size);
-		mark = (PMARK)baseView;
+		mark = (PMARK)((char *)past_starting + sizeof(USHORT) + mark ->size);
+		printf("Mark: %x \n", mark->begin_Mark);
+		past_starting = (LPVOID)(((char *)past_starting) +sizeof(USHORT) + mark->size);
 	}
+	LPVOID base = (((char*)past_starting) + sizeof(USHORT) * 3 + sizeof(UINT));
 
-	PTIFF_HEADER tHeader = (PTIFF_HEADER)baseView;
+	PTIFF_HEADER tHeader = (PTIFF_HEADER)past_starting;
 	printf("Mark: %x \n", tHeader->mark);
 	printf("Size: %x \n", tHeader->size);
 	printf("ExifHeader: %x \n", tHeader->exifHeader);
@@ -165,8 +215,12 @@ VOID PrintTags(LPVOID baseView) {
 	printf("TagMark: %x \n", tHeader->tagMark);
 	printf("OffsetToIFD: %x \n", tHeader->offsetToFirstIFD);
 
-	PNUMBER_ENTRIES entries = (PNUMBER_ENTRIES)(tHeader->offsetToFirstIFD + (sizeof(UINT)*2)+(sizeof(USHORT)) +((char*)baseView));
-	for (DWORD i = 0; i < entries->numberOfEntries; ++i) {
+	//PNUMBER_ENTRIES entries = (PNUMBER_ENTRIES)(tHeader->offsetToFirstIFD + (sizeof(UINT)*2)+(sizeof(USHORT)) +((char*)baseView));
+	char* aux = (char *)(tHeader->offsetToFirstIFD + (sizeof(UINT) * 2) + (sizeof(USHORT)) + ((char*)past_starting));
+	USHORT n_elems = (USHORT)aux;
+
+
+	/*for (DWORD i = 0; i < entries->numberOfEntries; ++i) {
 		long data_address;
 		if (tHeader->brand == INTEL) {
 			VerifyInIntelMode(entries->entries[i], tHeader);
@@ -174,8 +228,75 @@ VOID PrintTags(LPVOID baseView) {
 		else {
 			VerifyInMMMode(entries->entries[i], tHeader);
 		}		
+	}*/
+	ULONG ifd0_add = (ULONG)aux;
+	aux = aux + sizeof(USHORT);
+	ULONG sub_offset;
+	for (DWORD i = 0; i < n_elems; ++i,aux += sizeof(ENTRIES)) {
+		PENTRIES entry = (PENTRIES) aux;
+		printf("EntryTag: 0x%x \n", entry->tagNumber);
+
+		if ((entry->tagNumber == EXIF_SUB_OFFSET_INTEL)
+			|| (entry->tagNumber == EXIF_SUB_OFFSET_MOT)) {
+			sub_offset = entry->offsetDataValue;
+			aux += sizeof(ENTRIES);
+			break;
+		}
+		if (tHeader->brand == INTEL) {
+			VerifyInIntelMode(entry, base);
+		}
+		else {
+			VerifyInMMMode(entry, base);
+		}
 	}
-	CloseHandle(baseView);
+	/*UINT ifd1_offset = (UINT)aux;
+	//char *something = (char *)(((char *) aux) + ifd1_offset);
+	char *aux1 = ((char *) base) + (SIZE_T)ifd1_offset;
+	n_elems = (USHORT)aux1;
+	aux1 = aux1 + sizeof(USHORT);
+	
+
+	for (DWORD i = 0; i < n_elems; ++i, aux1 += sizeof(ENTRIES)) {
+		PENTRIES entry = (PENTRIES)aux1;
+		printf("EntryTag: 0x%x \n", entry->tagNumber);
+
+		if ((entry->tagNumber == EXIF_SUB_OFFSET_INTEL)
+			|| (entry->tagNumber == EXIF_SUB_OFFSET_MOT)) {
+			sub_offset = entry->offsetDataValue;
+			aux1 += sizeof(ENTRIES);
+			break;
+		}
+		if (tHeader->brand == INTEL) {
+			VerifyInIntelMode(entry, base);
+		}
+		else {
+			VerifyInMMMode(entry, base);
+		}
+	}
+	*/
+	char *aux_sub = ((char *)base) + sub_offset;
+	n_elems = (USHORT)aux;
+	aux_sub = aux_sub + sizeof(USHORT);
+
+
+	for (DWORD i = 0; i < n_elems; ++i, aux_sub += sizeof(ENTRIES)) {
+		PENTRIES entry = (PENTRIES)aux_sub;
+		printf("EntryTag: 0x%x \n", entry->tagNumber);
+
+		if ((entry->tagNumber == EXIF_SUB_OFFSET_INTEL)
+			|| (entry->tagNumber == EXIF_SUB_OFFSET_MOT)) {
+			sub_offset = entry->offsetDataValue;
+			aux += sizeof(ENTRIES);
+			break;
+		}
+		if (tHeader->brand == INTEL) {
+			VerifyInIntelMode(entry, base);
+		}
+		else {
+			VerifyInMMMode(entry, base);
+		}
+	}
+	//CloseHandle(baseView);
 }
 
 LPVOID MappingHandler(HANDLE hFile) {
