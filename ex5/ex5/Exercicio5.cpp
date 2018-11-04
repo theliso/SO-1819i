@@ -39,10 +39,11 @@ typedef struct{
 }MARK, *PMARK; 
 
 typedef struct {
-	USHORT		mark;
-	USHORT		size;
 	UINT		exifHeader;
 	USHORT		exifData;
+}BEFORETIFF, *PBEFORETIFF;
+
+typedef struct {
 	USHORT		brand;
 	USHORT		tagMark;
 	UINT		offsetToFirstIFD;
@@ -59,7 +60,7 @@ typedef struct {
 
 typedef struct {
 	USHORT numberOfEntries;
-	PENTRIES entries[1];
+	ENTRIES entries[];
 	//PENTRIES entries;
 }NUMBER_ENTRIES, *PNUMBER_ENTRIES;
 
@@ -204,77 +205,61 @@ VOID PrintTags(LPVOID baseView) {
 		printf("Mark: %x \n", mark->begin_Mark);
 		past_starting = (LPVOID)(((char *)past_starting) +sizeof(USHORT) + mark->size);
 	}
-	LPVOID base = (((char*)past_starting) + sizeof(USHORT) * 3 + sizeof(UINT));
-
-	PTIFF_HEADER tHeader = (PTIFF_HEADER)past_starting;
-	printf("Mark: %x \n", tHeader->mark);
-	printf("Size: %x \n", tHeader->size);
-	printf("ExifHeader: %x \n", tHeader->exifHeader);
-	printf("ExifData: %x \n", tHeader->exifData);
+	
+	PTIFF_HEADER tHeader = (PTIFF_HEADER)(((char *)past_starting) + sizeof(MARK) + sizeof(BEFORETIFF));
 	printf("Brand: %x \n", tHeader->brand);
 	printf("TagMark: %x \n", tHeader->tagMark);
 	printf("OffsetToIFD: %x \n", tHeader->offsetToFirstIFD);
 
-	//PNUMBER_ENTRIES entries = (PNUMBER_ENTRIES)(tHeader->offsetToFirstIFD + (sizeof(UINT)*2)+(sizeof(USHORT)) +((char*)baseView));
-	char* aux = (char *)(tHeader->offsetToFirstIFD + (sizeof(UINT) * 2) + (sizeof(USHORT)) + ((char*)past_starting));
-	USHORT n_elems = (USHORT)aux;
+	//char* aux = (char *)(tHeader->offsetToFirstIFD + (sizeof(UINT) * 2) + (sizeof(USHORT)) + ((char*)past_starting));
+	char* aux = (char *)(tHeader->offsetToFirstIFD + ((char *)tHeader));
+	PNUMBER_ENTRIES helper = (PNUMBER_ENTRIES)aux;
+	USHORT n_elems = helper->numberOfEntries;
+	printf("N_ELEMS: %x \n", n_elems);
 
-
-	/*for (DWORD i = 0; i < entries->numberOfEntries; ++i) {
-		long data_address;
-		if (tHeader->brand == INTEL) {
-			VerifyInIntelMode(entries->entries[i], tHeader);
-		}
-		else {
-			VerifyInMMMode(entries->entries[i], tHeader);
-		}		
-	}*/
-	ULONG ifd0_add = (ULONG)aux;
 	aux = aux + sizeof(USHORT);
 	ULONG sub_offset;
 	for (DWORD i = 0; i < n_elems; ++i,aux += sizeof(ENTRIES)) {
 		PENTRIES entry = (PENTRIES) aux;
 		printf("EntryTag: 0x%x \n", entry->tagNumber);
-
 		if ((entry->tagNumber == EXIF_SUB_OFFSET_INTEL)
 			|| (entry->tagNumber == EXIF_SUB_OFFSET_MOT)) {
-			sub_offset = entry->offsetDataValue;
-			aux += sizeof(ENTRIES);
-			break;
+			sub_offset = entry->offsetDataValue;		
 		}
 		if (tHeader->brand == INTEL) {
-			VerifyInIntelMode(entry, base);
+			VerifyInIntelMode(entry, tHeader);
 		}
 		else {
-			VerifyInMMMode(entry, base);
+			VerifyInMMMode(entry, tHeader);
 		}
 	}
-	/*UINT ifd1_offset = (UINT)aux;
+	UINT ifd1_offset = (UINT)aux;
+	printf("EntryTag: 0x%x \n", ifd1_offset);
 	//char *something = (char *)(((char *) aux) + ifd1_offset);
-	char *aux1 = ((char *) base) + (SIZE_T)ifd1_offset;
-	n_elems = (USHORT)aux1;
-	aux1 = aux1 + sizeof(USHORT);
+	char *aux_ifd1 = ((char *) baseView) + ifd1_offset;
+	n_elems = (USHORT)aux_ifd1;
+	aux_ifd1 = aux_ifd1 + sizeof(USHORT);
 	
 
-	for (DWORD i = 0; i < n_elems; ++i, aux1 += sizeof(ENTRIES)) {
-		PENTRIES entry = (PENTRIES)aux1;
+	for (DWORD i = 0; i < n_elems; ++i, aux_ifd1 += sizeof(ENTRIES)) {
+		PENTRIES entry = (PENTRIES)aux_ifd1;
 		printf("EntryTag: 0x%x \n", entry->tagNumber);
 
 		if ((entry->tagNumber == EXIF_SUB_OFFSET_INTEL)
 			|| (entry->tagNumber == EXIF_SUB_OFFSET_MOT)) {
 			sub_offset = entry->offsetDataValue;
-			aux1 += sizeof(ENTRIES);
+			aux_ifd1 += sizeof(ENTRIES);
 			break;
 		}
 		if (tHeader->brand == INTEL) {
-			VerifyInIntelMode(entry, base);
+			VerifyInIntelMode(entry, tHeader);
 		}
 		else {
-			VerifyInMMMode(entry, base);
+			VerifyInMMMode(entry, tHeader);
 		}
 	}
-	*/
-	char *aux_sub = ((char *)base) + sub_offset;
+	
+	char *aux_sub = ((char *)tHeader) + sub_offset;
 	n_elems = (USHORT)aux;
 	aux_sub = aux_sub + sizeof(USHORT);
 
@@ -290,10 +275,10 @@ VOID PrintTags(LPVOID baseView) {
 			break;
 		}
 		if (tHeader->brand == INTEL) {
-			VerifyInIntelMode(entry, base);
+			VerifyInIntelMode(entry, tHeader);
 		}
 		else {
-			VerifyInMMMode(entry, base);
+			VerifyInMMMode(entry, tHeader);
 		}
 	}
 	//CloseHandle(baseView);
