@@ -16,19 +16,17 @@ void emptyCounters(_Out_ PCommitCounters counters) {
 }
 
 BOOL GetCommitCountersFromProcess(int pid, _Out_ PCommitCounters counters) {
-	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
 	if (hProcess == NULL) {
 		emptyCounters(counters);
 		return FALSE;
 	}
-	MEMORY_BASIC_INFORMATION mbi, *pmbi;
+	MEMORY_BASIC_INFORMATION mbi;
 	SYSTEM_INFO si;
 	GetSystemInfo(&si);
-
 	LPVOID base = si.lpMinimumApplicationAddress;
-
-	while (base < si.lpMaximumApplicationAddress) {
-		VirtualQueryEx(hProcess, &si, &mbi, sizeof(pmbi));
+	SIZE_T size;
+	while ( size = VirtualQueryEx(hProcess, base, &mbi, sizeof(mbi)) != 0) {
 		if (mbi.State == MEM_COMMIT) {
 			if (mbi.Type == MEM_IMAGE) {
 				counters->img += mbi.RegionSize;
@@ -40,7 +38,7 @@ BOOL GetCommitCountersFromProcess(int pid, _Out_ PCommitCounters counters) {
 				counters->prv += mbi.RegionSize;
 			}
 		}
-		base = ((char*)base + mbi.RegionSize);
+		base = (char *)base + mbi.RegionSize;
 	}	
 	return TRUE;
 }
@@ -51,12 +49,12 @@ void printResults(PCommitCounters counters) {
 	printf("private counter = %d \n", counters->prv);
 }
 
-int main(int argc, char argv[]) {
-	if (argc < 3) {
+int main(int argc, char *argv[]) {
+	if (argc < 2) {
 		printf("No process was specified as argument of the program!");
 		return 1;
 	}
-	int id = atoi(&argv[2]);
+	int id = atoi(argv[1]);
 	PCommitCounters commit = (PCommitCounters)malloc(sizeof(CommitCounters));
 	emptyCounters(commit);
 	if (GetCommitCountersFromProcess(id, commit)) {
@@ -64,7 +62,6 @@ int main(int argc, char argv[]) {
 		return 0;
 	}
 	printf("%d",GetLastError());
-	getchar();
 
 	return 0;
 }
