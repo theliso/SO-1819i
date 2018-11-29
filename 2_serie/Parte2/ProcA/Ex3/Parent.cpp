@@ -6,6 +6,8 @@
 
 #define BUFFER_SIZE 100
 
+bool terminate = FALSE;
+
 VOID createReadObserver(LPVOID readObserver) {
 	HANDLE stdOut = GetStdHandle(STD_OUTPUT_HANDLE);
 	char buffer[BUFFER_SIZE];
@@ -14,6 +16,17 @@ VOID createReadObserver(LPVOID readObserver) {
 		if (ReadFile((HANDLE)readObserver, buffer, BUFFER_SIZE, &written, NULL)) {
 			WriteFile(stdOut, buffer, written, NULL, NULL);
 		}
+		if (GetLastError() == ERROR_BROKEN_PIPE) {
+			terminate = TRUE;
+			break;
+		}
+		buffer[written-2] = '\0';
+		DWORD len = strlen(buffer);
+		if (strcmp(buffer, "exit") == 0) {
+			terminate = TRUE;
+			break;
+		}
+
 	}
 }
 
@@ -51,22 +64,28 @@ VOID ReadFromConsole(HANDLE stdIn, HANDLE write, char *buffer) {
 		return;
 	}
 	buffer[written] = '\0';
+	DWORD len = strlen(buffer);
 	WriteFile(write, buffer, strlen(buffer), NULL, NULL);
 }
 
 VOID WriteToHandle(HANDLE read, char *buffer) {
 	DWORD written;
+	DWORD len = strlen(buffer);
 	WriteFile(read, buffer, strlen(buffer), &written, NULL);
 }
 
 VOID ReadConsole(HANDLE write, HANDLE read) {
 	HANDLE threadRead = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)createReadObserver, (LPVOID)read, 0, NULL);
-	while (TRUE) {
+	while (terminate == 0) {
 		char buffer[BUFFER_SIZE];
+		if (terminate) {
+			break;
+		}
 		ReadFromConsole(GetStdHandle(STD_INPUT_HANDLE), write, buffer);
 		if (buffer != NULL) {
 			WriteToHandle(read, buffer);
 		}
+		
 	}
 	CloseHandle(threadRead);
 	CloseHandle(write);
