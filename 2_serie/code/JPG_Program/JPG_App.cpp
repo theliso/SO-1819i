@@ -27,6 +27,16 @@ typedef struct {
 	PRESULT res;
 } JPG_CTX, *PJPG_CTX;
 
+typedef struct {
+	PCHAR filePath;
+	JPG_CTX jpeg;
+	UINT count;
+}PARAMS, *PPARAMS;
+
+volatile DWORD count = 0;
+static HANDLE signal;
+
+
 // Callback to JPG_ProcessExifTags
 BOOL ProcessExifTag(LPCVOID ctx, DWORD tag, LPVOID value) {
 	BOOL retVal = true;
@@ -55,12 +65,22 @@ BOOL ProcessExifTag(LPCVOID ctx, DWORD tag, LPVOID value) {
 	return retVal;
 }
 
+DWORD __stdcall DelegateWork(PVOID params) {
+
+	PPARAMS args = (PPARAMS)params;
+	JPEG_ProcessExifTagsA(args->filePath, ProcessExifTag, &args->jpeg);
+	InterlockedDecrement(&count);
+	while (count > 0);
+	SetEvent(signal);
+	return 0;
+}
+
+
 VOID OrganizePhotosByDateTaken(PCHAR srcPath, PCHAR dstPath, PRESULT res) {
 	CHAR buffer[MAX_PATH];		// auxiliary buffer
 								// the buffer is needed to define a match string that guarantees 
 								// a priori selection for all files
 	sprintf_s(buffer, "%s/%s", srcPath, "*.*");
-
 	WIN32_FIND_DATAA fileData;
 	HANDLE fileIt = FindFirstFileA(buffer, &fileData);
 	if (fileIt == INVALID_HANDLE_VALUE) return;
@@ -80,12 +100,19 @@ VOID OrganizePhotosByDateTaken(PCHAR srcPath, PCHAR dstPath, PRESULT res) {
 			// Process file archive
 			printf("Processing %s\n", filepath);
 			JPG_CTX jpgCtx = { fileData.cFileName, filepath, dstPath, res };
-			JPEG_ProcessExifTagsA(filepath, ProcessExifTag, &jpgCtx);
+			PPARAMS args = (PPARAMS)malloc(sizeof(PARAMS));
+			args->filePath = filepath;
+			args->jpeg = jpgCtx;
+			InterlockedIncrement(&count);
+			QueueUserWorkItem(DelegateWork, (PVOID)args, NULL);
+			ResetEvent(signal);
+			if (count > 0) {
+				WaitForSingleObject(signal, INFINITE);
+				SetEvent(signal);
+			}
 		}
 	} while (FindNextFileA(fileIt, &fileData) == TRUE);
-
 	FindClose(fileIt);
-
 }
 
 DWORD main(DWORD argc, PCHAR argv[]) {
@@ -98,10 +125,13 @@ DWORD main(DWORD argc, PCHAR argv[]) {
 	// Initiate arguments to operation
 	RESULT res = { 0 };
 	InitializeListHead(&res.filesToDeleteCollection);
-
+	
+	signal = CreateEvent(NULL, TRUE, FALSE, NULL);
+	
 	// Realize operation
 	OrganizePhotosByDateTaken(argv[1], argv[2], &res);
 	
+
 	// Print result and delete files copied
 	BOOL toDelete = *(argv[3] + 1) == 'D';
 	while (IsListEmpty(&res.filesToDeleteCollection) == FALSE) {

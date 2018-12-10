@@ -3,13 +3,6 @@
 
 #include <Windows.h>
 
-// Set unaligned struct fields
-#pragma pack(push, 1)
-
-
-// Unset unaligned struct fields
-#pragma pack(pop)
-
 typedef BOOL(*PROCESS_EXIF_TAG)(LPCVOID ctx, DWORD tag, LPVOID value);
 
 #ifdef JPEGEXIFUTILS_DLL_EXPORT
@@ -22,14 +15,14 @@ typedef BOOL(*PROCESS_EXIF_TAG)(LPCVOID ctx, DWORD tag, LPVOID value);
 extern "C" {
 #endif
 
-	JPEGEXIFUTILS_DLL_API VOID JPEG_PrintMetadataA(PCHAR fileimage);
-	JPEGEXIFUTILS_DLL_API VOID JPEG_PrintMetadataW(PWCHAR fileimage);
+	JPEGEXIFUTILS_DLL_API BOOL JPEG_PrintMetadataA(PCHAR fileimage);
+	JPEGEXIFUTILS_DLL_API BOOL JPEG_PrintMetadataW(PWCHAR fileimage);
 
 	/*
 	 * Call processor for each exif tag in fileimage while processor returns true. Return immediatly after processor returns false.
 	 */
-	JPEGEXIFUTILS_DLL_API VOID JPEG_ProcessExifTagsA(PCHAR fileimage, PROCESS_EXIF_TAG processor, LPCVOID ctx);
-	JPEGEXIFUTILS_DLL_API VOID JPEG_ProcessExifTagsW(PWCHAR fileimage, PROCESS_EXIF_TAG processor, LPCVOID ctx);
+	JPEGEXIFUTILS_DLL_API BOOL JPEG_ProcessExifTagsA(PCHAR fileimage, PROCESS_EXIF_TAG processor, LPCVOID ctx);
+	JPEGEXIFUTILS_DLL_API BOOL JPEG_ProcessExifTagsW(PWCHAR fileimage, PROCESS_EXIF_TAG processor, LPCVOID ctx);
 
 #ifdef UNICODE
 #define JPEG_PrintMetadata JPEG_PrintMetadataW
