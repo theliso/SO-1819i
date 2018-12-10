@@ -30,7 +30,6 @@ typedef struct {
 typedef struct {
 	PCHAR filePath;
 	JPG_CTX jpeg;
-	UINT count;
 }PARAMS, *PPARAMS;
 
 volatile DWORD count = 0;
@@ -66,7 +65,7 @@ BOOL ProcessExifTag(LPCVOID ctx, DWORD tag, LPVOID value) {
 }
 
 DWORD __stdcall DelegateWork(PVOID params) {
-
+	ResetEvent(signal);
 	PPARAMS args = (PPARAMS)params;
 	JPEG_ProcessExifTagsA(args->filePath, ProcessExifTag, &args->jpeg);
 	InterlockedDecrement(&count);
@@ -105,11 +104,11 @@ VOID OrganizePhotosByDateTaken(PCHAR srcPath, PCHAR dstPath, PRESULT res) {
 			args->jpeg = jpgCtx;
 			InterlockedIncrement(&count);
 			QueueUserWorkItem(DelegateWork, (PVOID)args, NULL);
-			ResetEvent(signal);
+			/*ResetEvent(signal);
 			if (count > 0) {
 				WaitForSingleObject(signal, INFINITE);
 				SetEvent(signal);
-			}
+			}*/
 		}
 	} while (FindNextFileA(fileIt, &fileData) == TRUE);
 	FindClose(fileIt);
@@ -130,6 +129,9 @@ DWORD main(DWORD argc, PCHAR argv[]) {
 	
 	// Realize operation
 	OrganizePhotosByDateTaken(argv[1], argv[2], &res);
+	if (count > 0) {
+		WaitForSingleObject(signal, INFINITE);
+	}
 	
 
 	// Print result and delete files copied
