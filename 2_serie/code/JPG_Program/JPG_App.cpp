@@ -32,7 +32,8 @@ typedef struct {
 	JPG_CTX jpeg;
 }PARAMS, *PPARAMS;
 
-volatile DWORD count = 0;
+volatile long count = 0;
+DWORD max = 10;
 static HANDLE signal;
 
 
@@ -60,16 +61,14 @@ BOOL ProcessExifTag(LPCVOID ctx, DWORD tag, LPVOID value) {
 			InsertTailList(&pctx->res->filesToDeleteCollection, &newNode->link);
 		}
 		retVal = false;
+		InterlockedDecrement(&count);
 	}
 	return retVal;
 }
 
 DWORD __stdcall DelegateWork(PVOID params) {
-	ResetEvent(signal);
 	PPARAMS args = (PPARAMS)params;
 	JPEG_ProcessExifTagsA(args->filePath, ProcessExifTag, &args->jpeg);
-	InterlockedDecrement(&count);
-	while (count > 0);
 	SetEvent(signal);
 	return 0;
 }
@@ -104,11 +103,10 @@ VOID OrganizePhotosByDateTaken(PCHAR srcPath, PCHAR dstPath, PRESULT res) {
 			args->jpeg = jpgCtx;
 			InterlockedIncrement(&count);
 			QueueUserWorkItem(DelegateWork, (PVOID)args, NULL);
-			/*ResetEvent(signal);
-			if (count > 0) {
+			if (InterlockedOr(&count, 0) == max) {
 				WaitForSingleObject(signal, INFINITE);
-				SetEvent(signal);
-			}*/
+				ResetEvent(signal);
+			}
 		}
 	} while (FindNextFileA(fileIt, &fileData) == TRUE);
 	FindClose(fileIt);
@@ -129,9 +127,9 @@ DWORD main(DWORD argc, PCHAR argv[]) {
 	
 	// Realize operation
 	OrganizePhotosByDateTaken(argv[1], argv[2], &res);
-	if (count > 0) {
+	/*if () {
 		WaitForSingleObject(signal, INFINITE);
-	}
+	}*/
 	
 
 	// Print result and delete files copied
