@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include "ex1.h"
+#include "Sync.h"
 #include <stdio.h>
 #include <tchar.h>
 #include <string.h>
@@ -20,35 +21,14 @@ typedef struct {
 	LPVOID userCtx;
 } USERCTX, *PUSERCTX;
 
-typedef struct {
-	volatile LONG counter;
-}COUNT_WORK, *PCOUNT_WORK;
+
 
 volatile HANDLE ioCompletionPort;
-volatile DWORD Terminate = 0;
-volatile DWORD HasInitialized = 0;
+volatile LONG Terminate = 0;
+volatile LONG HasInitialized = 0;
+volatile LONG CanProcced = 1;
 COUNT_WORK work;
 
-VOID Initialize(PCOUNT_WORK work) {
-	InterlockedExchange(&work->counter, 0);
-}
-
-VOID WorkIncremet(PCOUNT_WORK work) {
-
-	InterlockedIncrement(&work->counter);
-
-}
-
-VOID WorkDecrement(PCOUNT_WORK work) {
-	if (InterlockedAnd(&work->counter, -1L) > 0) {
-		InterlockedDecrement(&work->counter);
-	}
-}
-
-VOID WaitForWorkDone(PCOUNT_WORK work) {
-	while (InterlockedAnd(&work->counter, -1L))
-		;
-}
 
 
 HANDLE CreateNewCompletionPort(DWORD numberOfThreads) {
@@ -73,6 +53,9 @@ PUSERCTX CreateContext(HANDLE hfile, AsyncCallback cb, LPVOID userCtx) {
 
 VOID EraseCtx(PUSERCTX ctx) {
 	CloseHandle(ctx->hfile);
+	free(ctx->histogram);
+	free(&ctx->ov);
+	free(ctx->buffer);
 	free(ctx);
 }
 
@@ -139,7 +122,7 @@ BOOL ProccessRead(PUSERCTX ctx, BOOL queueStatus, DWORD bytesTransfered) {
 		return FALSE;
 	}
 	SetFileOffset(&ctx->ov, ctx->read);
-	if (!ReadFileAsync(ctx->hfile, ctx->buffer + ctx->read, BUFFER_SIZE - ctx->read, &ctx->ov)) {
+	if (!ReadFileAsync(ctx->hfile, ctx->buffer, BUFFER_SIZE, &ctx->ov)) {
 		ReleaseContext(ctx, GetLastError());
 		return FALSE;
 	}
@@ -152,8 +135,6 @@ DWORD WINAPI DelegateWork(LPVOID lparams) {
 	OVERLAPPED *ov = 0;
 	while (TRUE) {
 		BOOL res = GetQueuedCompletionStatus(ioCompletionPort, &bytesTransfered, &completionKey, &ov, INFINITE);
-
-		if (!res) break;
 
 		if (completionKey == WORK) {
 			if (!ProccessRead((PUSERCTX)ov, res, bytesTransfered)) break;
@@ -168,6 +149,9 @@ DWORD WINAPI DelegateWork(LPVOID lparams) {
 BOOL AsyncInit() {
 	DWORD previousValue = InterlockedExchange(&HasInitialized, TRUE);
 	if (previousValue == FALSE) {
+
+		while (InterlockedAnd(&CanProcced, -1L) == 0);
+
 		DWORD nrOfChars = 26;
 		ioCompletionPort = CreateNewCompletionPort(MAX_THREADS);
 		if (ioCompletionPort == INVALID_HANDLE_VALUE) return FALSE;
@@ -175,28 +159,36 @@ BOOL AsyncInit() {
 			HANDLE thread = CreateThread(NULL, 0, DelegateWork, NULL, 0, NULL);
 		}
 		Initialize(&work);
+		InterlockedExchange(&Terminate, 0);
 		return TRUE;
 	}
+
+	while (InterlockedAnd(&CanProcced, -1L) == 0);
+
 	return TRUE;
 }
 
 VOID AsyncTerminate() {
+	WaitForWorkDone(&work);
 	if (InterlockedCompareExchange(&Terminate, 1, 0) == 0) {
-		WaitForWorkDone(&work);
 		CloseHandle(ioCompletionPort);
 		for (int i = 0; i < MAX_THREADS; ++i) {
 			PostQueuedCompletionStatus(ioCompletionPort, 0, DONE, NULL);
 		}
+		InterlockedExchange(&CanProcced, 0);
+		InterlockedExchange(&HasInitialized, 0);
 	}
 }
+
+
+//----------------------------------
 
 VOID printHistogram(LPVOID userCtx, DWORD status, UINT32 *histogram) {
 	for (size_t i = 0; i < 26; i++)
 	{
-		printf("%c: %d \n", ('A' + i), histogram[i]);
+		printf("%s -> %c: %d \n", (PCHAR)userCtx, ('A' + i), histogram[i]);
 	}
 }
-
 
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
@@ -225,3 +217,4 @@ int main(int argc, char *argv[]) {
 	getchar();
 	return 0;
 }
+

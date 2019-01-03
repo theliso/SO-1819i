@@ -23,5 +23,8 @@
     <ClInclude Include="ex1.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Sync.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
