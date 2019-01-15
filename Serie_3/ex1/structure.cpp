@@ -15,7 +15,6 @@ typedef struct {
 	CHAR buffer[BUFFER_SIZE];
 	HANDLE hfile;
 	DWORD read;
-	DWORD fileSize;
 	UINT32 *histogram;
 	AsyncCallback cb;
 	LPVOID userCtx;
@@ -46,16 +45,12 @@ PUSERCTX CreateContext(HANDLE hfile, AsyncCallback cb, LPVOID userCtx) {
 	ctx->hfile = hfile;
 	ctx->userCtx = userCtx;
 	ctx->read = 0;
-	ctx->fileSize = GetFileSize(hfile, NULL);
 	ctx->histogram = (UINT32 *)calloc(26, sizeof(UINT) * 26);
 	return ctx;
 }
 
 VOID EraseCtx(PUSERCTX ctx) {
 	CloseHandle(ctx->hfile);
-	free(ctx->histogram);
-	free(&ctx->ov);
-	free(ctx->buffer);
 	free(ctx);
 }
 
@@ -105,21 +100,17 @@ BOOL ProccessRead(PUSERCTX ctx, BOOL queueStatus, DWORD bytesTransfered) {
 	ctx->read += bytesTransfered;
 
 	if (!queueStatus && error == ERROR_HANDLE_EOF) {
-		WorkDecrement(&work);
 		ReleaseContext(ctx, error);
+		WorkDecrement(&work);
 		return FALSE;
 	}
 	for (DWORD i = 0; i < bytesTransfered; ++i) {
 		char c = ctx->buffer[i];
 		int idx = toupper(c) - 'A';
+		if (idx < 0) continue;
 		UINT aux = ctx->histogram[idx];
 		aux += 1;
 		ctx->histogram[idx] = aux;
-	}
-	if (ctx->fileSize == ctx->read) {
-		WorkDecrement(&work);
-		ReleaseContext(ctx, error);
-		return FALSE;
 	}
 	SetFileOffset(&ctx->ov, ctx->read);
 	if (!ReadFileAsync(ctx->hfile, ctx->buffer, BUFFER_SIZE, &ctx->ov)) {
@@ -134,7 +125,7 @@ DWORD WINAPI DelegateWork(LPVOID lparams) {
 	DWORD completionKey = 0;
 	OVERLAPPED *ov = 0;
 	while (TRUE) {
-		BOOL res = GetQueuedCompletionStatus(ioCompletionPort, &bytesTransfered, &completionKey, &ov, INFINITE);
+		BOOL res = GetQueuedCompletionStatus(ioCompletionPort, &bytesTransfered, (PULONG_PTR)&completionKey, &ov, INFINITE);
 
 		if (completionKey == WORK) {
 			if (!ProccessRead((PUSERCTX)ov, res, bytesTransfered)) break;
@@ -169,52 +160,21 @@ BOOL AsyncInit() {
 }
 
 VOID AsyncTerminate() {
+
+	if (InterlockedAnd(&HasInitialized, -1L) == 0) return;
+
 	WaitForWorkDone(&work);
 	if (InterlockedCompareExchange(&Terminate, 1, 0) == 0) {
+		InterlockedExchange(&CanProcced, 0);
 		CloseHandle(ioCompletionPort);
 		for (int i = 0; i < MAX_THREADS; ++i) {
 			PostQueuedCompletionStatus(ioCompletionPort, 0, DONE, NULL);
 		}
-		InterlockedExchange(&CanProcced, 0);
 		InterlockedExchange(&HasInitialized, 0);
+		InterlockedExchange(&CanProcced, 1);
 	}
 }
 
 
-//----------------------------------
 
-VOID printHistogram(LPVOID userCtx, DWORD status, UINT32 *histogram) {
-	for (size_t i = 0; i < 26; i++)
-	{
-		printf("%s -> %c: %d \n", (PCHAR)userCtx, ('A' + i), histogram[i]);
-	}
-}
-
-int main(int argc, char *argv[]) {
-	if (argc < 2) {
-		printf("specify the file you want to open and proccess!\n");
-		return 0;
-	}
-	char *p = argv[1];
-	if (!AsyncInit()) {
-		printf("couldn't initialize the structure!\n");
-		return 0;
-	}
-
-	if (!HistogramFileAsync(p, printHistogram, p)) {
-		DWORD error = GetLastError();
-		if (error == ERROR_HANDLE_EOF || error == ERROR_HANDLES_CLOSED) {
-			printf("finish proccessing file\n");
-		}
-		else {
-			if (error == ERROR_INVALID_HANDLE) {
-				printf("there was an error on proccessing file! \n");
-			}
-		}
-	}
-	printf("finish main\n");
-	AsyncTerminate();
-	getchar();
-	return 0;
-}
 

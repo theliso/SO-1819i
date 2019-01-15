@@ -4,11 +4,15 @@
 
 
 #define MAX_PATH 17
+#define NUMBER_OF_FILES 4
 
 
 VOID printHistogram(LPVOID userCtx, DWORD status, UINT32 *histogram) {
+	char *ctx = (PCHAR)userCtx;
+
 	for (size_t i = 0; i < 26; i++)
 	{
+		UINT32 j = histogram[i];
 		printf("%s -> %c: %d \n", (PCHAR)userCtx, ('A' + i), histogram[i]);
 	}
 }
@@ -28,31 +32,33 @@ VOID TestSingleFileCount() {
 
 VOID TestMultiplesFilesCount() {
 	printf("begin TestMultiplesFilesCount");
-	char *files[1];
+	char *files[NUMBER_OF_FILES];
 	AsyncInit();
-
-	for (int i = 0; i < 2; ++i) {
+	for (int i = 0; i < NUMBER_OF_FILES; ++i) {
 		files[i] = (char *)malloc(MAX_PATH);
-		if (i == 1) {
-			sprintf_s(files[i], MAX_PATH, "../ex1/file.txt");
+		if (i == 0) {
+			snprintf(files[i], MAX_PATH, "../ex1/file.txt");
 			HistogramFileAsync(files[i], printHistogram, files[i]);
 		}
 		else {
-			sprintf_s(files[i], MAX_PATH, "../ex1/file1.txt");
+			snprintf(files[i], MAX_PATH, "../ex1/file%d.txt", i);
 			HistogramFileAsync(files[i], printHistogram, files[i]);
 		}
 	}
 	AsyncTerminate();
+	for (int i = 0; i < NUMBER_OF_FILES; ++i) {
+		free(files[i]);
+	}
 }
 
 int main() {
-	printf("starting test in one file");
+	printf("starting test in one file \n");
 	TestSingleFileCount();
-	printf("end TestSingleFileCount");
-	printf("press any key to start count multiple files");
+	printf("end TestSingleFileCount \n");
+	printf("press any key to start count multiple files \n");
 	getchar();
 	TestMultiplesFilesCount();
-	printf("end TestMultiplesFilesCount");
-	printf("press any key to end the application");
+	printf("end TestMultiplesFilesCount \n");
+	printf("press any key to end the application \n");
 	getchar();
 }
